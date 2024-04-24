@@ -16,7 +16,7 @@ st.set_page_config(layout="wide")
 #device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "cpu"
 uploaded_file = None
-model = "guest_model.pth"
+model = "rguest_model.pth"
 img_size = 256
 
 # update on model change
