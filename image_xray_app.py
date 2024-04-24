@@ -19,6 +19,7 @@ uploaded_file = None
 img_size = 256
 
 # update on model change
+model = "rguest_model.pth"
 last_mod_time = os.path.getmtime(model)
 updated_time = ctime()
 current_mod_time = os.path.getmtime(model)
