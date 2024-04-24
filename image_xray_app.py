@@ -16,7 +16,6 @@ st.set_page_config(layout="wide")
 #device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "cpu"
 uploaded_file = None
-model = "rguest_model.pth"
 img_size = 256
 
 # update on model change
@@ -123,8 +122,8 @@ def tensor_to_rgb_image(tensor: torch.tensor) -> Image:
 
 ## app
 
-model = torch.load("rmodel.pth").to(device)
-model.load_state_dict(torch.load("rguest_model.pth"))
+model = torch.load("rmodel.pth",map_location=torch.device("cpu")).to(device)
+model.load_state_dict(torch.load("rguest_model.pth", map_location=torch.device("cpu")))
 
 uploaded_file = st.file_uploader("Choose image", label_visibility="hidden")
 css = '''
