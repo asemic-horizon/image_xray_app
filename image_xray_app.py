@@ -68,8 +68,13 @@ def run_model(image, layer=0):
     return x.squeeze(0)
 
 def display(xrays, q = 0.05, norm = False, cmap="bone"):
+    channels, width, height = xrays.shape
+    # 4 columns for 256x256 images, proportionally more for smaller
+    # N images of width 256 are displayed in 4 columns and ceil(N/4) rows
+    # N images of width 128 are displayed in 8 columns and ceil(N/4) rows
+    # 4 * 256 / 128 = ...
+    W = min(16,max(5,int(320 / width)))
     L = len(xrays)
-    W = min(4, int(1 + np.sqrt(L)))
     cols = st.columns(W)
     col_assignment = [i % W for i in range(L)]
     for img, j in zip(xrays, col_assignment):
