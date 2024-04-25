@@ -69,11 +69,22 @@ def run_model(image, layer=0):
 
 def display(xrays, q = 0.05, norm = False, cmap="bone"):
     channels, width, height = xrays.shape
-    # 4 columns for 256x256 images, proportionally more for smaller
-    # N images of width 256 are displayed in 4 columns and ceil(N/4) rows
-    # N images of width 128 are displayed in 8 columns and ceil(N/4) rows
-    # 4 * 256 / 128 = ...
-    W = min(16,max(5,int(320 / width)))
+    # Analysis of resnet50 image sizes
+    # # Image starts at 256x256
+    # conv1 is  Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+    # output is  (input_size - 7 + 2*3) // 2 + 1 = 128 x 128
+
+    # # layer2: First bottleneck has stride=2 in the second conv layer
+    # Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+    # output = (layer1_output - 3 + 2*1) // 2 + 1 = 64 x 64
+
+    # # layer3: First bottleneck has stride=2 in the second conv layer
+    # Conv2d(128, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+    # layer3_output = (layer2_output - 3 + 2*1) // 2 + 1  # 32 x 32
+
+    # # layer4: First bottleneck has stride=2 in the second conv layer
+    # layer4_output = (layer3_output - 3 + 2*1) // 2 + 1  = 16 x 16
+    W = {128: 5, 64: 7, 32: 9, 16: 12, 8: 24}.get(width,16)
     L = len(xrays)
     cols = st.columns(W)
     col_assignment = [i % W for i in range(L)]
