@@ -1,7 +1,7 @@
-import torch.nn as nn 
-import torch.nn.functional as F
-from torchvision import models
 import torch
+import torch.nn as nn
+from torchvision import models
+
 
 def initialize_weights(m):
     if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
@@ -14,12 +14,16 @@ class ConvAutoencoder(nn.Module):
     def __init__(self):
         super(ConvAutoencoder, self).__init__()
         # Load a pre-trained ResNet50 model
-        self.ldim = 1024
-        self.encoder = models.resnet18(pretrained=True)
+        self.ldim = 36
+        self.encoder = models.resnet50(pretrained=True)
         
         # Replace the last layer with a trainable layer for encoding
-        self.encoder.fc = nn.Linear(self.encoder.fc.in_features, self.ldim)
-        
+        self.encoder.fc = nn.Sequential(
+            nn.Linear(self.encoder.fc.in_features, self.ldim),
+            nn.Sigmoid(),
+            nn.Linear(self.ldim, self.ldim),
+            nn.Sigmoid())
+              
         # Decoder
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(self.ldim, 128, kernel_size=3, stride=3, padding=0, output_padding=0),  
