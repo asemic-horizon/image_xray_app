@@ -137,6 +137,12 @@ def tensor_to_rgb_image(tensor: torch.tensor) -> Image:
     img = (255 * img).astype(np.uint8)
     return Image.fromarray(img)
 
+@st.cache_data
+def read_image(uploaded_file):
+    image = Image.open(uploaded_file)
+    image = center_crop(image)
+    return image
+
 ## app
 
 model = torch.load("rmodel.pth",map_location=torch.device("cpu")).to(device)
@@ -170,16 +176,13 @@ if uploaded_file is None:
     main.warning("Please upload an image file")
     st.stop()
 else:
-    image = Image.open(uploaded_file)
-    image = center_crop(image)    
-
-    image = image.convert("RGB")
+    image = read_image(uploaded_file)
     ft_show = sidebar.radio(
         "Choose view",
         ["Layer 1", "Layer 2", "Layer 3","Layer 4","Input"],
         index=3)
     q = sidebar.slider('Contrast',0.0,0.2,value=0.0,step=0.01)
-    norm = sidebar.checkbox("Normalize each", value=False)
+    norm = sidebar.checkbox("Normalize each", value=True)
     cmap = sidebar.radio("Colormap", ["bone","cubehelix","jet","coolwarm"])
 with main:
     if ft_show == "Input":
@@ -202,4 +205,4 @@ with main:
     elif ft_show.startswith("Layer"):
         num = int(ft_show.split()[-1])
         x_images = run_model(image, num)
-        display(x_images, q, cmap = cmap)
+        display(x_images, q, cmap = cmap, norm = norm)
