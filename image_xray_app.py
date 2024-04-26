@@ -33,12 +33,13 @@ def soft_clip(tensor, q=0.1):
     return (1e-6 + tensor - lower) / (1e-6 + upper - lower)
 
 def channel_to_image(tensor, q = 0.05, norm = False, cmap="cubehelix"):
-    # input is (1, width, height) tensor
+    # input is (width, height) tensor
+    width, height = tensor.shape
     tensor = tensor.detach().cpu()
     if norm:
+        tensor = tensor.view(width*height)
         tensor = F.softmax(tensor, dim=0)
-        tensor = F.softmax(tensor, dim=1)
-        tensor = F.sigmoid(tensor)
+        tensor = tensor.view(width, height)
         tensor = soft_clip(tensor, q)
     tensor = tensor.numpy()
     tensor = np.clip(tensor, 0, 1)
@@ -84,7 +85,7 @@ def display(xrays, q = 0.05, norm = False, cmap="bone"):
 
     # # layer4: First bottleneck has stride=2 in the second conv layer
     # layer4_output = (layer3_output - 3 + 2*1) // 2 + 1  = 16 x 16
-    W = {128: 5, 64: 7, 32: 9, 16: 12, 8: 24}.get(width,16)
+    W = {128: 4, 64: 5, 32: 7, 16: 12, 8: 16}.get(width,16)
     L = len(xrays)
     cols = st.columns(W)
     col_assignment = [i % W for i in range(L)]
@@ -133,13 +134,14 @@ def tensor_to_rgb_image(tensor: torch.tensor) -> Image:
     # reshaping from 1 x 3 x w x h to w x h x 3
     img = tensor.squeeze(0).detach().cpu().numpy()
     img = np.moveaxis(img, 0, -1)
+    img = (1e-7 + img)/(1e-7 + img.max())
     img = np.clip(img, 0, 1)
     img = (255 * img).astype(np.uint8)
     return Image.fromarray(img)
 
 @st.cache_data
 def read_image(uploaded_file):
-    image = Image.open(uploaded_file)
+    image = Image.open(uploaded_file).convert("RGB")
     image = center_crop(image)
     return image
 
@@ -179,30 +181,36 @@ else:
     image = read_image(uploaded_file)
     ft_show = sidebar.radio(
         "Choose view",
-        ["Layer 1", "Layer 2", "Layer 3","Layer 4","Input"],
+        ["Layer 1", "Layer 2", "Layer 3","Layer 4","Output","Comparison"],
         index=3)
     q = sidebar.slider('Contrast',0.0,0.2,value=0.0,step=0.01)
     norm = sidebar.checkbox("Normalize each", value=True)
-    cmap = sidebar.radio("Colormap", ["bone","cubehelix","jet","coolwarm"])
 with main:
-    if ft_show == "Input":
-        cx, c1, c2 = main.columns([1,2,2])
-        view_source = c1.checkbox("src", value=False, key="source")
-        view_output = c2.checkbox("out", value=True, key="output")
-        if view_output:
-            x = rgb_image_to_tensor(image).to(device)
-            output = model.forward(x)
+    if ft_show == "Output":
+        x = rgb_image_to_tensor(image).to(device)
+        output = model.forward(x)
+        d1, d2,d3 = st.columns([1,3,1])
+        d2.image(tensor_to_rgb_image(soft_clip(output,q)), caption="Output Image", use_column_width=True)
+    if ft_show == "Comparison":
+        alpha = sidebar.slider("Noise level", 0.0, 1.0, 0.3, 0.01)
+        x = rgb_image_to_tensor(image).to(device)
+        xbar = (1-alpha)*x + alpha*(x.mean() + torch.randn_like(x) * (x-x.mean()) / x.std()).clamp(0,1)
+        output = model.forward(x)
+        outputbar = model.forward(xbar)
+        imagebar = tensor_to_rgb_image(soft_clip(xbar,q))
+        d1, d2, d3 = st.columns(3)
+        d1.image(image, use_column_width=True, caption="Source image")
+        d1.image(imagebar, use_column_width=True, caption="Source-like noise")
+        d2.image(tensor_to_rgb_image(soft_clip(output,q)), caption="Output Image", use_column_width=True)
+        d2.image(tensor_to_rgb_image(soft_clip(outputbar,q)), caption="Source-like output",use_column_width=True)
+        error = output.clamp(0.2,0.8) * torch.abs(output - x)
+        error /= error.max()
+        d3.image(tensor_to_rgb_image(error), caption="Error Image", use_column_width=True)
 
-        if view_output and (view_source):
-            d1, d2, d3 = st.columns(3)
-            d1.image(image, use_column_width=True, caption="Source image")
-            d2.image(tensor_to_rgb_image(soft_clip(output,q)), caption="Output Image", use_column_width=True)
-            error = abs(output - x)
-            d3.image(tensor_to_rgb_image(error), caption="Error Image", use_column_width=True)
-        if view_output and not (view_source):
-            d1, d2,d3 = st.columns([1,3,1])
-            d2.image(tensor_to_rgb_image(soft_clip(output,q)).resize((600,600),Image.Resampling.NEAREST), caption="Output Image", use_column_width=False)
+        d3.image(tensor_to_rgb_image(soft_clip(abs(output - outputbar),q)), caption="Output delta", use_column_width=True)
     elif ft_show.startswith("Layer"):
+        cmap = sidebar.radio("Colormap", ["bone","cubehelix","jet","coolwarm"])
+
         num = int(ft_show.split()[-1])
         x_images = run_model(image, num)
         display(x_images, q, cmap = cmap, norm = norm)
